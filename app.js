@@ -1,21 +1,28 @@
-const express = require('express');
-const path = require('path');
-const indexRouter = require('./routes/index');
+const WebSocket = require('ws');
 
-const app = express();
-const PORT = 3000;
+const port = process.env.PORT || 8080;  // Use Heroku's assigned port or 8080 for local development
 
-// Serve static files from the "public" directory
-app.use(express.static(path.join(__dirname, 'public')));
+const wss = new WebSocket.Server({ port });
 
-// Use the router for handling routes
-app.use('/', indexRouter);
+function broadcastToOthers(message, sender) {
+    wss.clients.forEach(client => {
+        if (client !== sender && client.readyState === WebSocket.OPEN) {
+            client.send(message.toString());
+        }
+    });
+}
 
-// Catch-all route for handling 404 errors
-app.use((req, res, next) => {
-    res.status(404).sendFile(path.join(__dirname, 'views', '404.html'));
-  });
+wss.on('connection', (ws) => {
+    console.log('New client connected.');
 
-app.listen(PORT, () => {
-  console.log(`Server running at http://localhost:${PORT}/`);
+    ws.on('message', (message) => {
+        console.log('Received:', message.toString());
+        broadcastToOthers(message, ws);
+    });
+
+    ws.on('close', () => {
+        console.log('Client disconnected.');
+    });
 });
+
+console.log(`WebSocket server is running on port ${port}`);
